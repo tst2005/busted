@@ -2,11 +2,14 @@ require 'luassert.assert'
 
 local json = require 'dkjson'
 local ansicolors = require 'ansicolors'
-
+local lanes = require 'lanes'
+lanes.configure()
 -- setup for stuff we use inside
 local global_context = { type = "describe", description = "global" }
 local current_context = global_context
 local busted_options = {}
+local tests = {}
+local linda = lanes.linda()
 
 output = require('output.utf_terminal')()
 
@@ -36,24 +39,40 @@ local test = function(description, callback)
   return test_status
 end
 
+local num_tests = 0
 run_context = function(context)
   local status = { description = context.description, type = "description" }
 
+  local function set_status(astatus)
+    linda:send("result", astatus)
+  end
+
   for i,v in ipairs(context) do
-    if context.before_each ~= nil then
-      context.before_each()
-    end
-
     if v.type == "test" then
-      table.insert(status, test(v.description, v.callback))
-    elseif v.type == "describe" then
-      table.insert(status, run_context(v))
-    elseif v.type == "pending" then
-      table.insert(status, { type = "pending", description = v.description, info = v.info })
-    end
+      num_tests = num_tests + 1
+      table.insert(tests, function()
+        if context.before_each ~= nil then
+          context.before_each()
+        end
+        set_status(test(v.description, v.callback))
+        if context.after_each ~= nil then
+          context.after_each()
+        end
+      end)
+    else
+      if context.before_each ~= nil then
+        context.before_each()
+      end
 
-    if context.after_each ~= nil then
-      context.after_each()
+      if v.type == "describe" then
+        table.insert(status, run_context(v))
+      elseif v.type == "pending" then
+        table.insert(status, { type = "pending", description = v.description, info = v.info })
+      end
+
+      if context.after_each ~= nil then
+        context.after_each()
+      end
     end
   end
 
@@ -85,6 +104,14 @@ end
 local busted = function()
   local ms = os.clock()
   local statuses = run_context(global_context)
+  for k,v in pairs(tests) do
+    lanes.gen(v())()
+  end
+
+  while num_tests ~= 0 do
+    num_tests = num_tests-1
+    table.insert(status, linda:receive("result"))
+  end
 
   ms = os.clock() - ms
 
