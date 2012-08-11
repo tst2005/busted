@@ -4,12 +4,16 @@ local json = require 'dkjson'
 local ansicolors = require 'ansicolors'
 local lanes = require 'lanes'
 lanes.configure()
+
 -- setup for stuff we use inside
 local global_context = { type = "describe", description = "global" }
 local current_context = global_context
 local busted_options = {}
 local tests = {}
 local linda = lanes.linda()
+
+local successes = 0
+local failures = 0
 
 output = require('output.utf_terminal')()
 
@@ -26,10 +30,14 @@ local test = function(description, callback)
 
   local status, err = pcall(callback)
 
-  local test_status = { type = "success", description = description, info = info }
+  local test_status = {}
 
   if err then
     test_status = { type = "failure", description = description, info = info, trace = debug.traceback(), err = err }
+    failures = failures + 1
+  else
+    successes = successes + 1
+    test_status = { type = "success", description = description, info = info }
   end
 
   if not busted_options.defer_print then
@@ -67,7 +75,9 @@ run_context = function(context)
       if v.type == "describe" then
         table.insert(status, run_context(v))
       elseif v.type == "pending" then
-        table.insert(status, { type = "pending", description = v.description, info = v.info })
+      local pending_test_status = { type = "pending", description = v.description, info = v.info }
+      v.callback(pending_test_status)
+      table.insert(status, pending_test_status)
       end
 
       if context.after_each ~= nil then
@@ -84,12 +94,19 @@ local play_sound = function(failures)
     "You have %d busted specs",
     "Your specs are busted",
     "Your code is bad and you should feel bad",
+    "Your code is in the Danger Zone",
+    "Strange game. The only way to win is not to test",
+    "My grandmother wrote better specs on a 3 86",
+    "Every time there's a failure, drink another beer",
+    "Feels bad man"
   }
 
   local success_messages = {
     "Aww yeah, passing specs",
     "Doesn't matter, had specs",
     "Feels good, man",
+    "Great success",
+    "Tests pass, drink another beer",
   }
 
   math.randomseed(os.time())
@@ -103,6 +120,11 @@ end
 
 local busted = function()
   local ms = os.clock()
+
+  if not busted_options.defer_print then
+    print(output.header(global_context))
+  end
+
   local statuses = run_context(global_context)
   for k,v in pairs(tests) do
     lanes.gen(v())()
@@ -119,6 +141,12 @@ local busted = function()
     play_sound(failures)
   end
 
+  if busted_options.defer_print then
+    print(output.header(global_context))
+  end
+
+  successes = 0
+  failures = 0
   return output.formatted_status(statuses, busted_options, ms)
 end
 
@@ -153,13 +181,18 @@ pending = function(description, callback)
     linedefined = debug_info.linedefined,
   }
 
-  local test_status = { description = description, type = "pending", info = info }
+  local test_status = {
+    description = description,
+    type = "pending",
+    info = info,
+    callback = function(self)
+  if not busted_options.defer_print then
+        output.currently_executing(self, busted_options)
+  end
+end
+  }
 
   table.insert(current_context, test_status)
-
-  if not busted_options.defer_print then
-    output.currently_executing(test_status, busted_options)
-  end
 end
 
 spy_on = function(object, method)
