@@ -10,3 +10,6 @@
 [submodule "cliargs"]
 	path = cliargs
 	url = ../lua-cliargs/
+[submodule "ansicolors"]
+	path = ansicolors
+	url = ../lua-ansicolors/
