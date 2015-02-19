@@ -1,3 +1,6 @@
 [submodule "luassert"]
 	path = luassert
 	url = ../lua-luassert/
+[submodule "say"]
+	path = say
+	url = ../lua-say/
