@@ -7,3 +7,6 @@
 [submodule "mediator"]
 	path = mediator
 	url = ../lua-mediator/
+[submodule "cliargs"]
+	path = cliargs
+	url = ../lua-cliargs/
