@@ -4,3 +4,6 @@
 [submodule "say"]
 	path = say
 	url = ../lua-say/
+[submodule "mediator"]
+	path = mediator
+	url = ../lua-mediator/
