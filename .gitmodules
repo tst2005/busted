@@ -1,0 +1,3 @@
+[submodule "luassert"]
+	path = luassert
+	url = ../lua-luassert/
